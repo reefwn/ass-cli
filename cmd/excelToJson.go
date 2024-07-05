@@ -3,99 +3,100 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/xuri/excelize/v2"
 )
 
-var inputPath string
-var outputPath string
-var sheetIndex int
-
-var excelToJsonCmd = &cobra.Command{
-	Use:   "excel2json",
-	Short: "Convert an excel file to a json file",
-	Long:  "Convert an excel file to a json file",
+var excelToJSONCmd = &cobra.Command{
+	Use:   "excelToJson [inputPath] [outputPath] [sheetIndex]",
+	Short: "Convert Excel to JSON",
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		if inputPath == "" {
-			log.Fatal("Input path must be provided")
+		inputPath := args[0]
+		var outputPath string
+		sheetIndex := 0
+
+		if len(args) > 1 {
+			outputPath = args[1]
+		} else {
+			outputPath = strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + ".json"
 		}
 
-		if outputPath == "" {
-			outputPath = defaultOutputPath(inputPath)
-		}
-
-		f, err := excelize.OpenFile(inputPath)
-		if err != nil {
-			log.Fatalf("Failed to open excel file: %v", err)
-		}
-
-		sheetName := f.GetSheetName(sheetIndex)
-		if sheetName == "" {
-			log.Fatalf("Sheet index %d does not exist", sheetIndex)
-		}
-
-		rows, err := f.GetRows(sheetName)
-		if err != nil {
-			log.Fatalf("Failed to get rows from sheet: %v", err)
-		}
-
-		if len(rows) < 1 {
-			log.Fatal("No data found in sheet")
-		}
-
-		headers := rows[0]
-		data := []map[string]string{}
-
-		for _, row := range rows[1:] {
-			if isEmptyRow(row) {
-				continue
+		if len(args) > 2 {
+			index, err := strconv.Atoi(args[2])
+			if err != nil {
+				fmt.Println("Error: invalid sheetIndex", args[2])
+				return
 			}
-			item := make(map[string]string)
-			for i, cell := range row {
-				if i < len(headers) {
-					item[headers[i]] = cell
-				}
-			}
-			data = append(data, item)
+			sheetIndex = index
 		}
 
-		jsonData, err := json.Marshal(data)
+		err := excelToJSON(inputPath, outputPath, sheetIndex)
 		if err != nil {
-			log.Fatalf("Failed to marshal data to JSON: %v", err)
+			fmt.Println("Error:", err)
+		} else {
+			fmt.Println("Successfully converted", inputPath, "to", outputPath)
 		}
-
-		err = os.WriteFile(outputPath, jsonData, 0644)
-		if err != nil {
-			log.Fatalf("Failed to write JSON to file: %v", err)
-		}
-
-		fmt.Printf("Excel file %s has been converted to JSON and saved to %s\n", inputPath, outputPath)
 	},
 }
 
-func isEmptyRow(row []string) bool {
-	for _, cell := range row {
-		if cell != "" {
-			return false
-		}
-	}
-	return true
-}
-
-func defaultOutputPath(inputPath string) string {
-	ext := filepath.Ext(inputPath)
-	name := inputPath[:len(inputPath)-len(ext)]
-	return name + ".json"
-}
-
 func init() {
-	rootCmd.AddCommand(excelToJsonCmd)
+	rootCmd.AddCommand(excelToJSONCmd)
+}
 
-	excelToJsonCmd.Flags().StringVarP(&inputPath, "inputPath", "i", "", "Input Excel file path")
-	excelToJsonCmd.Flags().StringVarP(&outputPath, "outputPath", "o", "", "Output JSON file path (default is same as input file name with .json extension)")
-	excelToJsonCmd.Flags().IntVarP(&sheetIndex, "sheetIndex", "s", 0, "Sheet index (starting from 0)")
+func excelToJSON(inputPath, outputPath string, sheetIndex int) error {
+	// Open the Excel file
+	f, err := excelize.OpenFile(inputPath)
+	if err != nil {
+		return err
+	}
+
+	// Get the sheet name by index
+	sheetName := f.GetSheetName(sheetIndex)
+	if sheetName == "" {
+		return fmt.Errorf("sheetIndex %d is out of range", sheetIndex)
+	}
+
+	// Read all rows from the specified sheet
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		return err
+	}
+
+	if len(rows) < 1 {
+		return fmt.Errorf("the Excel file is empty")
+	}
+
+	// Create a slice of maps to hold the JSON data
+	var data []map[string]interface{}
+	headers := rows[0]
+
+	// Convert each row to a map and append it to the data slice
+	for _, row := range rows[1:] {
+		record := make(map[string]interface{})
+		for colIndex, cell := range row {
+			if colIndex < len(headers) {
+				record[headers[colIndex]] = cell
+			}
+		}
+		data = append(data, record)
+	}
+
+	// Marshal the data to JSON
+	jsonData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	// Write the JSON data to the output file
+	if err := os.WriteFile(outputPath, jsonData, 0644); err != nil {
+		return err
+	}
+
+	return nil
 }
