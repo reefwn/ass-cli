@@ -7,7 +7,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ass-cli",
+	Use:   "ass",
 	Short: "Assistant commands for daily usage",
 	Long:  "Assistant commands for daily usage",
 }

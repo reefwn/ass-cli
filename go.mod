@@ -3,6 +3,7 @@ module github.com/reefwn/ass-cli
 go 1.22.5
 
 require (
+	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect

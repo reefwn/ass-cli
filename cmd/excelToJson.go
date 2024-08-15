@@ -59,7 +59,7 @@ func excelToJSON(inputPath, outputPath string, sheetIndex int) error {
 	// Get the sheet name by index
 	sheetName := f.GetSheetName(sheetIndex)
 	if sheetName == "" {
-		return fmt.Errorf("sheetIndex %d is out of range", sheetIndex)
+		return fmt.Errorf("SheetIndex %d is out of range", sheetIndex)
 	}
 
 	// Read all rows from the specified sheet
@@ -69,7 +69,7 @@ func excelToJSON(inputPath, outputPath string, sheetIndex int) error {
 	}
 
 	if len(rows) < 1 {
-		return fmt.Errorf("the Excel file is empty")
+		return fmt.Errorf("The Excel file is empty")
 	}
 
 	// Create a slice of maps to hold the JSON data
