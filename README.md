@@ -6,6 +6,12 @@ Assistant commands for daily usage
 cobra-cli add {command_name}
 ```
 
+## Test command
+```
+go run main.go {command_name}
+```
+
+
 ## Build commands
 ```
 go build -o ass
