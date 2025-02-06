@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// remindCmd represents the remind command
 var remindCmd = &cobra.Command{
 	Use:   "remind",
 	Short: "Notify me",
