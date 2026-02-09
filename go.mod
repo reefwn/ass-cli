@@ -5,7 +5,9 @@ go 1.22.5
 require (
 	github.com/atotto/clipboard v0.1.4
 	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/gomarkdown/markdown v0.0.0-20250810172220-2e2c11897d1a
 	github.com/google/uuid v1.6.0
+	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/spf13/cobra v1.8.1
 	github.com/xuri/excelize/v2 v2.8.1
 )
