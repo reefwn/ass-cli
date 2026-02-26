@@ -10,59 +10,52 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var passwordCmd = &cobra.Command{
-	Use:   "password [length]",
-	Short: "Generate a random password",
-	Long:  "Generate a random password of specified length. Defaults to 12 characters using letters and numbers. Use --special to include special characters.",
-	Run: func(cmd *cobra.Command, args []string) {
-		length := 12
-		if len(args) > 0 {
-			var err error
-			length, err = strconv.Atoi(args[0])
-			if err != nil {
-				fmt.Println("Invalid length. Please provide a valid number.")
-				return
-			}
-			if length <= 0 {
-				fmt.Println("Length must be greater than 0.")
-				return
-			}
-		}
+var passwordSpecial bool
+var passwordLength int
 
-		special, _ := cmd.Flags().GetBool("special")
+var passwordCmd = &cobra.Command{
+	Use:   "password",
+	Short: "Generate a random password",
+	Run: func(cmd *cobra.Command, args []string) {
 		charset := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-		if special {
+		if passwordSpecial {
 			charset += "!@#$%^&*()_+-=[]{}|;:,.<>?"
 		}
 
-		password := generatePassword(length, charset)
-
-		if err := clipboard.WriteAll(password); err != nil {
-			log.Fatalf("Failed to copy to clipboard: %v", err)
+		password := make([]byte, passwordLength)
+		randomBytes := make([]byte, passwordLength)
+		if _, err := rand.Read(randomBytes); err != nil {
+			log.Fatalf("❌ %v", err)
+		}
+		for i := range password {
+			password[i] = charset[randomBytes[i]%byte(len(charset))]
 		}
 
-		fmt.Println("Generated password copied to clipboard:", password)
+		result := string(password)
+		if err := clipboard.WriteAll(result); err != nil {
+			log.Fatalf("❌ %v", err)
+		}
+		fmt.Println("📋", result)
 	},
-}
-
-func generatePassword(length int, charset string) string {
-	password := make([]byte, length)
-	charsetLen := len(charset)
-
-	randomBytes := make([]byte, length)
-	_, err := rand.Read(randomBytes)
-	if err != nil {
-		log.Fatalf("Failed to generate random bytes: %v", err)
-	}
-
-	for i := 0; i < length; i++ {
-		password[i] = charset[randomBytes[i]%byte(charsetLen)]
-	}
-
-	return string(password)
 }
 
 func init() {
 	rootCmd.AddCommand(passwordCmd)
-	passwordCmd.Flags().BoolP("special", "s", false, "Include special characters in the password")
+	passwordCmd.Flags().IntVarP(&passwordLength, "length", "l", 12, "Password length")
+	passwordCmd.Flags().BoolVarP(&passwordSpecial, "special", "s", false, "Include special characters")
+
+	// Keep backward compat: allow `ass password 20` positional arg
+	passwordCmd.Args = cobra.MaximumNArgs(1)
+	originalRun := passwordCmd.Run
+	passwordCmd.Run = func(cmd *cobra.Command, args []string) {
+		if len(args) > 0 && !cmd.Flags().Changed("length") {
+			if l, err := strconv.Atoi(args[0]); err == nil && l > 0 {
+				passwordLength = l
+			} else {
+				fmt.Println("❌ invalid length")
+				return
+			}
+		}
+		originalRun(cmd, args)
+	}
 }

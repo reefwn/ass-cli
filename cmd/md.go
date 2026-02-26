@@ -13,61 +13,54 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var mdCmd = &cobra.Command{
+	Use:   "md",
+	Short: "Markdown operations",
+}
+
 var mdToPdfCmd = &cobra.Command{
-	Use:   "mdToPdf [file]",
+	Use:   "to-pdf [file]",
 	Short: "Convert markdown file to PDF",
-	Long:  "Convert a markdown file to a PDF file. Takes a markdown file path as argument.",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		inputPath := args[0]
 
-		// Check if input file exists
 		if _, err := os.Stat(inputPath); os.IsNotExist(err) {
-			fmt.Printf("Error: File not found: %s\n", inputPath)
+			fmt.Printf("❌ file not found: %s\n", inputPath)
 			return
 		}
 
-		// Read markdown file
 		mdContent, err := os.ReadFile(inputPath)
 		if err != nil {
-			fmt.Printf("Error reading file: %v\n", err)
+			fmt.Printf("❌ %v\n", err)
 			return
 		}
 
-		// Create output filename
 		ext := filepath.Ext(inputPath)
-		baseName := strings.TrimSuffix(inputPath, ext)
-		outputPath := baseName + ".pdf"
+		outputPath := strings.TrimSuffix(inputPath, ext) + ".pdf"
 
-		// Convert markdown to HTML
 		extensions := parser.CommonExtensions | parser.AutoHeadingIDs
 		p := parser.NewWithExtensions(extensions)
 		htmlContent := markdown.ToHTML(mdContent, p, nil)
 
-		// Create PDF
 		pdf := gofpdf.New("P", "mm", "A4", "")
 		pdf.SetMargins(15, 15, 15)
 		pdf.AddPage()
 		pdf.SetFont("Arial", "", 12)
 
-		// Process HTML content
 		renderHTMLToPDF(pdf, string(htmlContent))
 
-		// Save PDF
 		if err := pdf.OutputFileAndClose(outputPath); err != nil {
-			fmt.Printf("Error creating PDF: %v\n", err)
+			fmt.Printf("❌ %v\n", err)
 			return
 		}
-
-		fmt.Printf("PDF created successfully: %s\n", outputPath)
+		fmt.Println("✅", outputPath)
 	},
 }
 
 func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
-	// Remove comments
 	htmlContent = regexp.MustCompile(`<!--.*?-->`).ReplaceAllString(htmlContent, "")
 
-	// Parse HTML tags and text content using regex
 	tagRe := regexp.MustCompile(`<(/?)([a-zA-Z0-9]+)[^>]*>`)
 
 	fontStyle := ""
@@ -76,7 +69,6 @@ func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
 	baseLeftMargin := 15.0
 	justStartedListItem := false
 
-	// Table state
 	inTable := false
 	inTableHeader := false
 	tableRow := []tableCell{}
@@ -85,12 +77,10 @@ func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
 	cellStyle := ""
 	inCell := false
 
-	// Find all tag positions
 	lastEnd := 0
 	matches := tagRe.FindAllStringSubmatchIndex(htmlContent, -1)
 
 	for _, match := range matches {
-		// Get text before this tag
 		if match[0] > lastEnd {
 			text := strings.TrimSpace(htmlContent[lastEnd:match[0]])
 			if text != "" {
@@ -105,7 +95,6 @@ func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
 		}
 		lastEnd = match[1]
 
-		// Extract tag info
 		isClosing := htmlContent[match[2]:match[3]] == "/"
 		tagName := strings.ToLower(htmlContent[match[4]:match[5]])
 
@@ -118,13 +107,11 @@ func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
 				pdf.Ln(8)
 			case "strong", "b":
 				fontStyle = ""
-				// Don't reset cellStyle here - keep it for the cell content
 				if !inCell {
 					pdf.SetFont("Arial", fontStyle, fontSize)
 				}
 			case "em", "i":
 				fontStyle = ""
-				// Don't reset cellStyle here - keep it for the cell content
 				if !inCell {
 					pdf.SetFont("Arial", fontStyle, fontSize)
 				}
@@ -140,7 +127,6 @@ func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
 					pdf.Ln(2)
 				}
 			case "li":
-				// Reset margin to list level (not text indent)
 				pdf.SetLeftMargin(baseLeftMargin + float64(listDepth)*10)
 				pdf.Ln(2)
 			case "ul", "ol":
@@ -163,9 +149,7 @@ func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
 			case "thead":
 				inTableHeader = false
 			case "tbody":
-				// Nothing special
 			case "tr":
-				// Render the row
 				if len(tableRow) > 0 {
 					renderTableRow(pdf, tableRow, tableColWidths, inTableHeader, baseLeftMargin)
 				}
@@ -219,7 +203,6 @@ func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
 					pdf.SetFont("Courier", "", fontSize)
 				}
 			case "p":
-				// Skip line break if we just started a list item
 				if !justStartedListItem && !inTable {
 					pdf.Ln(4)
 				}
@@ -229,21 +212,16 @@ func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
 				}
 			case "li":
 				pdf.Ln(5)
-				// Set X to current left margin for proper bullet placement
 				currentMargin := baseLeftMargin + float64(listDepth)*10
 				pdf.SetX(currentMargin)
-				// Draw a bullet circle
 				x := pdf.GetX()
 				y := pdf.GetY() + 2
-				pdf.SetFillColor(0, 0, 0) // Black fill for bullet
+				pdf.SetFillColor(0, 0, 0)
 				if listDepth > 1 {
-					// Nested: outline circle (empty inside)
 					pdf.Circle(x, y, 0.8, "D")
 				} else {
-					// Top level: filled circle
 					pdf.Circle(x, y, 1.0, "F")
 				}
-				// Set margin for text wrap alignment (after bullet)
 				textIndent := currentMargin + 4
 				pdf.SetLeftMargin(textIndent)
 				pdf.SetX(textIndent)
@@ -262,8 +240,7 @@ func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
 			case "table":
 				inTable = true
 				pdf.Ln(4)
-				// Default column widths - will be adjusted based on content
-				tableColWidths = []float64{120, 60} // Adjust as needed
+				tableColWidths = []float64{120, 60}
 			case "thead":
 				inTableHeader = true
 			case "tbody":
@@ -278,7 +255,6 @@ func renderHTMLToPDF(pdf *gofpdf.Fpdf, htmlContent string) {
 		}
 	}
 
-	// Handle any remaining text after the last tag
 	if lastEnd < len(htmlContent) {
 		text := strings.TrimSpace(htmlContent[lastEnd:])
 		if text != "" {
@@ -296,19 +272,15 @@ type tableCell struct {
 func renderTableRow(pdf *gofpdf.Fpdf, row []tableCell, colWidths []float64, isHeader bool, leftMargin float64) {
 	pdf.SetX(leftMargin)
 
-	// Adjust column widths if we have more columns than defined
 	for len(colWidths) < len(row) {
 		colWidths = append(colWidths, 40)
 	}
 
-	// Calculate total width and adjust if needed
-	pageWidth := 210.0 - leftMargin - 15 // A4 width minus margins
+	pageWidth := 210.0 - leftMargin - 15
 	totalWidth := 0.0
 	for i := 0; i < len(row); i++ {
 		totalWidth += colWidths[i]
 	}
-
-	// Scale column widths to fit page
 	if totalWidth > pageWidth {
 		scale := pageWidth / totalWidth
 		for i := range colWidths {
@@ -317,25 +289,18 @@ func renderTableRow(pdf *gofpdf.Fpdf, row []tableCell, colWidths []float64, isHe
 	}
 
 	cellHeight := 8.0
-
 	for i, cell := range row {
 		width := colWidths[i]
-
-		// Determine font style
 		style := cell.style
 		if isHeader && style == "" {
 			style = "B"
 		}
 		pdf.SetFont("Arial", style, 11)
-
-		// Set fill color
 		if isHeader {
 			pdf.SetFillColor(230, 230, 230)
 		} else {
 			pdf.SetFillColor(255, 255, 255)
 		}
-
-		// Draw cell with border
 		pdf.CellFormat(width, cellHeight, cell.text, "1", 0, "L", isHeader, 0, "")
 	}
 	pdf.Ln(cellHeight)
@@ -356,7 +321,6 @@ func decodeHTMLEntities(text string) string {
 	text = strings.ReplaceAll(text, "&ndash;", "-")
 	text = strings.ReplaceAll(text, "&mdash;", "-")
 
-	// Handle numeric character references
 	numericRe := regexp.MustCompile(`&#(\d+);`)
 	text = numericRe.ReplaceAllStringFunc(text, func(match string) string {
 		numStr := match[2 : len(match)-1]
@@ -372,5 +336,6 @@ func decodeHTMLEntities(text string) string {
 }
 
 func init() {
-	rootCmd.AddCommand(mdToPdfCmd)
+	rootCmd.AddCommand(mdCmd)
+	mdCmd.AddCommand(mdToPdfCmd)
 }
