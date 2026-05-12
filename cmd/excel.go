@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -141,8 +142,63 @@ var excelFromJsonCmd = &cobra.Command{
 	},
 }
 
+var excelToCsvCmd = &cobra.Command{
+	Use:   "to-csv [inputPath] [outputPath] [sheetIndex]",
+	Short: "Convert Excel to CSV",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		inputPath := args[0]
+		outputPath := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + ".csv"
+		sheetIndex := 0
+
+		if len(args) > 1 {
+			outputPath = args[1]
+		}
+		if len(args) > 2 {
+			idx, err := strconv.Atoi(args[2])
+			if err != nil {
+				fmt.Println("❌ invalid sheetIndex", args[2])
+				return
+			}
+			sheetIndex = idx
+		}
+
+		f, err := excelize.OpenFile(inputPath)
+		if err != nil {
+			fmt.Println("❌", err)
+			return
+		}
+
+		sheetName := f.GetSheetName(sheetIndex)
+		if sheetName == "" {
+			fmt.Printf("❌ sheetIndex %d out of range\n", sheetIndex)
+			return
+		}
+
+		rows, err := f.GetRows(sheetName)
+		if err != nil {
+			fmt.Println("❌", err)
+			return
+		}
+
+		out, err := os.Create(outputPath)
+		if err != nil {
+			fmt.Println("❌", err)
+			return
+		}
+		defer out.Close()
+
+		if err := csv.NewWriter(out).WriteAll(rows); err != nil {
+			fmt.Println("❌", err)
+			return
+		}
+		fmt.Println("✅", outputPath)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(excelCmd)
 	excelCmd.AddCommand(excelToJsonCmd)
 	excelCmd.AddCommand(excelFromJsonCmd)
+	excelCmd.AddCommand(excelToCsvCmd)
 }
